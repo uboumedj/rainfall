@@ -1,0 +1,28 @@
+bonus1 segfaults without an argument, and seems to do nothing when called with one.
+
+gdb tells us what it does. There's just a main function. It calls atoi on the first argument,
+and if the result is higher than 9, the program stops. If it's inferior, there's a memcpy call
+to a buffer of 40, copying (result of atoi * 4) bytes of the second argument.
+If the result of atoi is equal to 0x574f4c46 (i.e 1464814662), program actually executes a shell!
+
+The result is stored right after the buffer, so we can try to overflow the buffer with the memcpy call,
+but there's an issue: the check (result of atoi < 9) prevents us from copying more than 36 (9 * 4) characters
+into the buffer.
+
+There's a little trick: by providing the first argument as a negative number, it passes the first check.
+But then, when actually multiplied, the number, as an unsigned int, will become positive. It's just a matter 
+of finding the right negative number that, when multiplied under these conditions, will become 44 (to
+overflow the buffer by 4 bytes and access our number n). We can then write the value we want, and the program will execute a shell!
+
+To find the right value, I tested with a one line program I wrote in /tmp/bonus1.c.
+Basically, all it does is "printf("%u\n", (size_t)(atoi(argv[1]) * 4))"
+
+After using it for a minute, I found that -2147483637 resulted in 44. So MIN_INT + 11. Seems it's connected but I don't
+have time to investigate why.
+We'll write -2147483637 as first argument, and in the second we'll use python to generate 40 characters to fill the buffer, then
+\x46\x4c\x4f\x57 to change the value of our number and pass the final check.
+
+> ./bonus1 -2147483637 $(python -c "print 'x'*40 + '\x46\x4c\x4f\x57'")
+$>cd ../bonus2
+$>cat .pass
+579bd19263eb8655e4cf7b742d75edf8c38226925d78db8163506f5191825245

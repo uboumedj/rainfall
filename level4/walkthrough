@@ -1,0 +1,20 @@
+level4 contains only a call to a function [n].
+
+[n] calls [fgets], which is, like the last level, protected against buffer overflow.
+It then calls [p], another function that just does a printf exactly like the last 
+level.
+There's in fact only one change: instead of checking for 64 in the m variable, located
+at 0x08049810, it checks for 16930116 (0x1025544).
+It is going to be complicated to write that much characters inside the buffer of 512...
+
+If the check matches 16930116, the program directly prints the password for the next level. Nice.
+
+Fortunately, printf comes with a handy tool: padding. We'll use the address of first element of the stack
+with a %x, with a padding of 16930112. But first we need to find out where the m variable's address has to
+be written (i.e where the program stores the user's string on the stack).
+By using the same method as level3, with multiple %p's, we find out it's the 12th element.
+
+>python -c "'\x10\x98\x04\x08' + '%16930112x' + '%12\$n'" > /tmp/level4
+>cat /tmp/level4 - | ./level4
+$>[16930112 spaces, then the first address on the stack]
+$>0f99ba5e9c446258a69b290407a6c60859e9c2d25b26575cafc9ae6d75e9456a

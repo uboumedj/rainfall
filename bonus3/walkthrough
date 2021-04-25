@@ -1,0 +1,16 @@
+bonus3 does nothing without an argument, and simply prints an empty line when called with one argument.
+
+There's just a main function. It contains a buffer of 128 bytes. It actually reads the .pass file we need,
+and stores it in the buffer. Twice. It also performs an atoi on the argument we give it, and uses it as an
+index on the buffer, setting its value to 0.
+It finally does an strcmp on the buffer with the argument we gave earlier. If the return is 0, it opens a shell.
+If not, it will just puts the buffer from index 66 onward.
+
+There are traps here. The program actually reads from the .pass file, but there is no way to find out its content.
+No buffer overflow to exploit, etc.
+The way to solve this level is pretty simple. The program needs to pass the last strcmp check to open a shell. So our
+argument must be equal to the buffer, at least when checked with strcmp.
+The program at one point sets buffer[atoi(argv[1])] to 0. The only way to pass both of these conditions is to have
+our argument be an empty string.
+atoi(arg) will be 0, so the program will set buffer[0] to 0. In the eyes of strcmp, both our strings will be
+equal since it stops at the first \0.

@@ -1,0 +1,29 @@
+When first logging in the level0 account, there is a level0 binary.
+
+Executing it Segfaults. Let's open it with gdb.
+
+Running the program in gdb indicates that it segfaults when trying to use [atoi].
+Perhaps it lacks an argument?
+Let's exit and run the program with an argument.
+
+./level0 test
+>No !
+
+It doesn't segfault anymore! Let's go back in gdb and dive deeper.
+
+(gdb) > disas main
+
+We find out that after [atoi], the return value in $eax is compared with 0x1a7.
+0x1a7 is the hexadecimal form of 423.
+
+Let's try running level0 with 423 as argument.
+
+./level0 423
+$>
+
+It seems a new shell is opened.
+
+$>cat /home/user/level1/.pass
+$>1fe8a524fa4bec01ca4ea2a869af2a02260d4a7d5fe7e7c24d8617e6dca12d3a
+
+We got the flag!

